@@ -189,22 +189,56 @@ def is_available() -> bool:
 
 
 def _find_chromium_exe() -> str | None:
-    local_app = os.environ.get("LOCALAPPDATA", "")
     home = os.path.expanduser("~")
+    # All possible base dirs for Playwright browser cache
+    cache_bases = [
+        os.environ.get("PLAYWRIGHT_BROWSERS_PATH", ""),
+        os.environ.get("XDG_CACHE_HOME", os.path.join(home, ".cache")),
+        os.path.join(home, ".cache"),
+        os.path.join(home, "AppData", "Local"),
+        os.environ.get("LOCALAPPDATA", ""),
+    ]
     patterns = []
-    for base in filter(None, [local_app, os.path.join(home, "AppData", "Local")]):
+    for base in filter(None, cache_bases):
+        # Linux
+        for binary in ("chrome", "chromium"):
+            patterns.append(os.path.join(base, "ms-playwright", "chromium-*", "chrome-linux", binary))
+        # Windows
         for folder in ("chrome-win64", "chrome-win"):
             patterns.append(os.path.join(base, "ms-playwright", "chromium-*", folder, "chrome.exe"))
-    patterns.append(os.path.join(home, ".cache", "ms-playwright", "chromium-*", "chrome-linux", "chrome"))
-    patterns.append(os.path.join(
-        home, "Library", "Caches", "ms-playwright", "chromium-*",
-        "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium",
-    ))
+        # macOS
+        patterns.append(os.path.join(
+            base, "ms-playwright", "chromium-*",
+            "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium",
+        ))
+    # System binaries (fallback)
+    for sys_bin in ("/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"):
+        if os.path.isfile(sys_bin):
+            return sys_bin
     for p in patterns:
         m = glob.glob(p)
         if m:
             return m[0]
     return None
+
+
+def _debug_chromium_paths() -> str:
+    """Return diagnostic info about where Playwright installed Chromium."""
+    home = os.path.expanduser("~")
+    cache = os.environ.get("XDG_CACHE_HOME", os.path.join(home, ".cache"))
+    pw_dir = os.path.join(cache, "ms-playwright")
+    if not os.path.isdir(pw_dir):
+        return f"Папка {pw_dir} не существует"
+    try:
+        import subprocess as _sp
+        result = _sp.run(
+            ["find", pw_dir, "-name", "chrome", "-o", "-name", "chromium"],
+            capture_output=True, text=True, timeout=10
+        )
+        found = result.stdout.strip()
+        return f"Найдено в {pw_dir}:\n{found or '(ничего)'}"
+    except Exception as e:
+        return f"find error: {e}"
 
 
 def get_mode() -> tuple[str, str]:

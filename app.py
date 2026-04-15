@@ -89,9 +89,11 @@ else:
     elif mode == "local":
         st.success(f"Режим: **локальный Chromium** (`{detail}`)", icon="✅")
     else:
+        diag = playwright_scraper._debug_chromium_paths()
         st.error(
-            "**Chromium не найден.**\n\n"
-            f"Статус установки: `{_chromium_status}`",
+            f"**Chromium не найден.**\n\n"
+            f"Статус установки: `{_chromium_status}`\n\n"
+            f"```\n{diag}\n```",
             icon="⚠️",
         )
 
