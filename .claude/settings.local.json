@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.b2b-center.ru)",
+      "Bash(dir \"C:\\\\Users\\\\sanja\\\\AppData\\\\Local\\\\ms-playwright\")",
+      "Bash(dir \"C:\\\\Users\\\\sanja\\\\AppData\\\\Local\\\\ms-playwright\\\\chromium-1208\" /s /b)",
+      "Bash(findstr /i \"chrome.exe\\\\|chromium.exe\")"
+    ]
+  }
+}
