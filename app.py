@@ -126,6 +126,9 @@ if run_clicked:
                 elif etype == "result":
                     st.session_state["results"].append(event["data"])
 
+                elif etype == "debug":
+                    st.caption(f"🔍 {event.get('msg', '')}")
+
                 elif etype == "warning":
                     warnings_box.warning(event.get("message", "Неизвестное предупреждение"))
 

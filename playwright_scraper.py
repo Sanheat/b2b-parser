@@ -123,6 +123,7 @@ async def main(warmup_url: str, firm_urls: list):
             sys.stderr.write("WARMUP_DONE\n"); sys.stderr.flush()
 
         # --- Fetch each firm page ---
+        debug_saved = False
         for url in firm_urls:
             pg = await ctx.new_page()
             try:
@@ -133,12 +134,26 @@ async def main(warmup_url: str, firm_urls: list):
                     await pg.wait_for_selector(
                         "#id_spinner", state="hidden", timeout=15_000
                     )
-                    # Extra pause after challenge completes
                     await asyncio.sleep(1.5)
                 except Exception:
                     pass
                 html = await pg.content()
                 results[url] = html if html else ""
+                # Debug: log page title + first 300 chars for every page
+                title = await pg.title()
+                snippet = (html or "")[:300].replace("\n", " ")
+                sys.stderr.write(f"DEBUG_PAGE\t{url}\ttitle={title!r}\tsnippet={snippet!r}\n")
+                sys.stderr.flush()
+                # Save first firm page HTML to disk for inspection
+                if not debug_saved:
+                    try:
+                        with open("/tmp/debug_firm_remote.html", "w", encoding="utf-8") as f:
+                            f.write(html or "")
+                        sys.stderr.write(f"DEBUG_SAVED\t/tmp/debug_firm_remote.html\n")
+                    except Exception as de:
+                        sys.stderr.write(f"DEBUG_SAVE_ERR\t{de}\n")
+                    sys.stderr.flush()
+                    debug_saved = True
                 sys.stderr.write(f"OK\t{url}\n"); sys.stderr.flush()
             except Exception as e:
                 results[url] = ""
@@ -300,7 +315,15 @@ def scrape_firm_pages(
         elif tag == "WARMUP_DONE":
             yield {"type": "warmup_done"}
         elif tag == "WARMUP_ERR":
-            logger.warning("Warmup error: %s", line)
+            logger.warning("Warmup: %s", line)
+            yield {"type": "debug", "msg": f"[warmup] {line}"}
+        elif tag == "DEBUG_PAGE":
+            logger.info("Page debug: %s", line)
+            yield {"type": "debug", "msg": line}
+        elif tag == "DEBUG_SAVED":
+            yield {"type": "debug", "msg": f"HTML сохранён: {parts[1] if len(parts) > 1 else ''}"}
+        elif tag == "DEBUG_SAVE_ERR":
+            yield {"type": "debug", "msg": f"Не удалось сохранить HTML: {line}"}
         else:
             logger.debug("subprocess stderr: %s", line)
 
