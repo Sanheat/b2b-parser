@@ -128,7 +128,9 @@ async def main(warmup_url: str, firm_urls: list):
             pg = await ctx.new_page()
             try:
                 await pg.add_init_script(STEALTH_JS)
-                await pg.goto(url, wait_until="networkidle", timeout=40_000)
+                resp = await pg.goto(url, wait_until="networkidle", timeout=40_000)
+                http_status = resp.status if resp else "?"
+                sys.stderr.write(f"DEBUG_STATUS\t{url}\tHTTP {http_status}\n"); sys.stderr.flush()
                 # Wait for spinner to disappear (ServicePipe challenge)
                 try:
                     await pg.wait_for_selector(
@@ -208,18 +210,19 @@ def _find_chromium_exe() -> str | None:
 def get_mode() -> tuple[str, str]:
     """
     Returns (mode, detail):
-      mode = "remote"  — browserless.io token found in env
-      mode = "local"   — local Chromium found
+      mode = "local"   — local Chromium found (preferred)
+      mode = "remote"  — browserless.io token found in env (fallback)
       mode = "none"    — nothing available
     """
+    # Local Chromium takes priority — avoids data-center IP blocks
+    exe = _find_chromium_exe()
+    if exe:
+        return "local", exe
+
     token = os.environ.get("BROWSERLESS_TOKEN", "").strip()
     if token:
         masked = token[:6] + "..." + token[-4:] if len(token) > 10 else "***"
         return "remote", f"browserless.io (токен: {masked})"
-
-    exe = _find_chromium_exe()
-    if exe:
-        return "local", exe
 
     local_app = os.environ.get("LOCALAPPDATA", "N/A")
     return "none", (
@@ -317,6 +320,8 @@ def scrape_firm_pages(
         elif tag == "WARMUP_ERR":
             logger.warning("Warmup: %s", line)
             yield {"type": "debug", "msg": f"[warmup] {line}"}
+        elif tag == "DEBUG_STATUS":
+            yield {"type": "debug", "msg": f"[HTTP] {parts[1] if len(parts)>1 else ''} → {parts[2] if len(parts)>2 else ''}"}
         elif tag == "DEBUG_PAGE":
             logger.info("Page debug: %s", line)
             yield {"type": "debug", "msg": line}

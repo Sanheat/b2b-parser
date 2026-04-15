@@ -85,14 +85,13 @@ if not playwright_scraper.is_available():
 else:
     mode, detail = playwright_scraper.get_mode()
     if mode == "remote":
-        st.success(f"Режим: **облачный браузер** (browserless.io)", icon="☁️")
+        st.warning(f"Режим: **облачный браузер** (browserless.io) — возможны блокировки по IP", icon="☁️")
     elif mode == "local":
-        st.success("Режим: **локальный Chromium**", icon="✅")
+        st.success(f"Режим: **локальный Chromium** (`{detail}`)", icon="✅")
     else:
         st.error(
-            "**Chromium не найден и токен не задан.**\n\n"
-            "Установите локально: `playwright install chromium`\n\n"
-            "Или задайте `BROWSERLESS_TOKEN` в Streamlit Secrets.",
+            "**Chromium не найден.**\n\n"
+            f"Статус установки: `{_chromium_status}`",
             icon="⚠️",
         )
 
