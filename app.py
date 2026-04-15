@@ -55,24 +55,6 @@ delay = col2.slider(
     step=0.5,
 )
 
-# ── Browserless token (sidebar) ───────────────────────────────────────────────
-with st.sidebar:
-    st.header("⚙️ Настройки браузера")
-
-    # Allow token override via UI (takes priority over env var)
-    token_input = st.text_input(
-        "Browserless.io Token",
-        value=os.environ.get("BROWSERLESS_TOKEN", ""),
-        type="password",
-        help="Получите бесплатный токен на browserless.io — позволяет работать без локального Chromium (в т.ч. на Streamlit Cloud)",
-    )
-    if token_input:
-        os.environ["BROWSERLESS_TOKEN"] = token_input
-    elif "BROWSERLESS_TOKEN" in os.environ and not token_input:
-        del os.environ["BROWSERLESS_TOKEN"]
-
-    st.caption("[Получить токен на browserless.io →](https://browserless.io)")
-
 # ── Playwright status ─────────────────────────────────────────────────────────
 if not playwright_scraper.is_available():
     st.error(
@@ -90,7 +72,7 @@ else:
         st.error(
             "**Chromium не найден и токен не задан.**\n\n"
             "Установите локально: `playwright install chromium`\n\n"
-            "Или введите Browserless.io Token в боковой панели.",
+            "Или задайте `BROWSERLESS_TOKEN` в Streamlit Secrets.",
             icon="⚠️",
         )
 

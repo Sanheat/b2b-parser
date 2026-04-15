@@ -53,11 +53,11 @@ async def main(warmup_url: str, firm_urls: list):
     results = {}
     async with async_playwright() as p:
         if use_remote:
-            # --- Remote browser via browserless.io (no local Chromium needed) ---
-            ws_url = f"wss://chrome.browserless.io?token={token}"
+            # --- Remote browser via browserless.io (Playwright WebSocket protocol) ---
+            ws_url = f"wss://chrome.browserless.io/playwright?token={token}"
             sys.stderr.write(f"WARMUP_ERR\tINFO\tПодключение к browserless.io...\n")
             sys.stderr.flush()
-            browser = await p.chromium.connect_over_cdp(ws_url)
+            browser = await p.chromium.connect(ws_url)
             ctx = await browser.new_context(
                 locale="ru-RU",
                 timezone_id="Europe/Moscow",
