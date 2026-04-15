@@ -54,23 +54,30 @@ async def main(warmup_url: str, firm_urls: list):
     async with async_playwright() as p:
         if use_remote:
             # --- Remote browser via browserless.io (CDP) ---
-            # No &stealth=true — free plan doesn't support it
             ws_url = f"wss://chrome.browserless.io?token={token}"
             sys.stderr.write("WARMUP_ERR\tINFO\tПодключение к browserless.io...\n")
             sys.stderr.flush()
             browser = await p.chromium.connect_over_cdp(ws_url)
-            # CDP gives a default context; don't open warmup pages —
-            # extra navigation before scraping causes the session to close
             ctx = browser.contexts[0] if browser.contexts else await browser.new_context(
                 locale="ru-RU", timezone_id="Europe/Moscow",
                 user_agent=UA, viewport={"width": 1440, "height": 900},
                 extra_http_headers={"Accept-Language": "ru-RU,ru;q=0.9"},
             )
+            # NOTE: ctx.add_init_script doesn't work on CDP default context.
+            # Stealth JS is injected per-page below instead.
+
+            # Warmup: visit homepage to establish session cookies
             try:
-                await ctx.add_init_script(STEALTH_JS)
-            except Exception:
-                pass  # some CDP contexts don't support add_init_script
-            # Skip warmup for remote — browserless handles stealth internally
+                pg = await ctx.new_page()
+                await pg.add_init_script(STEALTH_JS)
+                await pg.set_extra_http_headers({"Referer": "https://www.google.com/"})
+                await pg.goto("https://www.b2b-center.ru/", wait_until="domcontentloaded", timeout=25_000)
+                await asyncio.sleep(2.0)
+                await pg.close()
+                sys.stderr.write("WARMUP_ERR\tINFO\tКуки установлены\n"); sys.stderr.flush()
+            except Exception as e:
+                sys.stderr.write(f"WARMUP_ERR\thomepage\t{e}\n"); sys.stderr.flush()
+
             sys.stderr.write("WARMUP_DONE\n"); sys.stderr.flush()
         else:
             # --- Local Chromium ---
@@ -119,6 +126,7 @@ async def main(warmup_url: str, firm_urls: list):
         for url in firm_urls:
             pg = await ctx.new_page()
             try:
+                await pg.add_init_script(STEALTH_JS)
                 await pg.goto(url, wait_until="networkidle", timeout=40_000)
                 # Wait for spinner to disappear (ServicePipe challenge)
                 try:
