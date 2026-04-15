@@ -54,24 +54,24 @@ async def main(warmup_url: str, firm_urls: list):
     async with async_playwright() as p:
         if use_remote:
             # --- Remote browser via browserless.io (CDP) ---
-            ws_url = f"wss://chrome.browserless.io?token={token}&stealth=true"
-            sys.stderr.write(f"WARMUP_ERR\tINFO\tПодключение к browserless.io...\n")
+            # No &stealth=true — free plan doesn't support it
+            ws_url = f"wss://chrome.browserless.io?token={token}"
+            sys.stderr.write("WARMUP_ERR\tINFO\tПодключение к browserless.io...\n")
             sys.stderr.flush()
             browser = await p.chromium.connect_over_cdp(ws_url)
-            # CDP connections already have a default context — reuse it
-            if browser.contexts:
-                ctx = browser.contexts[0]
+            # CDP gives a default context; don't open warmup pages —
+            # extra navigation before scraping causes the session to close
+            ctx = browser.contexts[0] if browser.contexts else await browser.new_context(
+                locale="ru-RU", timezone_id="Europe/Moscow",
+                user_agent=UA, viewport={"width": 1440, "height": 900},
+                extra_http_headers={"Accept-Language": "ru-RU,ru;q=0.9"},
+            )
+            try:
                 await ctx.add_init_script(STEALTH_JS)
-            else:
-                ctx = await browser.new_context(
-                    locale="ru-RU",
-                    timezone_id="Europe/Moscow",
-                    user_agent=UA,
-                    viewport={"width": 1440, "height": 900},
-                    extra_http_headers={
-                        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-                    },
-                )
+            except Exception:
+                pass  # some CDP contexts don't support add_init_script
+            # Skip warmup for remote — browserless handles stealth internally
+            sys.stderr.write("WARMUP_DONE\n"); sys.stderr.flush()
         else:
             # --- Local Chromium ---
             browser = await p.chromium.launch(
@@ -98,22 +98,22 @@ async def main(warmup_url: str, firm_urls: list):
             )
             await ctx.add_init_script(STEALTH_JS)
 
-        # --- Warmup: homepage → search page ---
-        for url, ref in [
-            ("https://www.b2b-center.ru/", "https://www.google.com/"),
-            (warmup_url, "https://www.b2b-center.ru/"),
-        ]:
-            pg = await ctx.new_page()
-            try:
-                await pg.set_extra_http_headers({"Referer": ref})
-                await pg.goto(url, wait_until="networkidle", timeout=30_000)
-                await asyncio.sleep(random.uniform(2.0, 3.5))
-            except Exception as e:
-                sys.stderr.write(f"WARMUP_ERR\t{url}\t{e}\n"); sys.stderr.flush()
-            finally:
-                await pg.close()
+            # --- Warmup only for local: homepage → search page ---
+            for url, ref in [
+                ("https://www.b2b-center.ru/", "https://www.google.com/"),
+                (warmup_url, "https://www.b2b-center.ru/"),
+            ]:
+                pg = await ctx.new_page()
+                try:
+                    await pg.set_extra_http_headers({"Referer": ref})
+                    await pg.goto(url, wait_until="networkidle", timeout=30_000)
+                    await asyncio.sleep(random.uniform(2.0, 3.5))
+                except Exception as e:
+                    sys.stderr.write(f"WARMUP_ERR\t{url}\t{e}\n"); sys.stderr.flush()
+                finally:
+                    await pg.close()
 
-        sys.stderr.write("WARMUP_DONE\n"); sys.stderr.flush()
+            sys.stderr.write("WARMUP_DONE\n"); sys.stderr.flush()
 
         # --- Fetch each firm page ---
         for url in firm_urls:
