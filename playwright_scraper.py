@@ -201,8 +201,9 @@ def _find_chromium_exe() -> str | None:
     patterns = []
     for base in filter(None, cache_bases):
         # Linux
-        for binary in ("chrome", "chromium"):
-            patterns.append(os.path.join(base, "ms-playwright", "chromium-*", "chrome-linux", binary))
+        for linux_dir in ("chrome-linux64", "chrome-linux"):
+            for binary in ("chrome", "chromium"):
+                patterns.append(os.path.join(base, "ms-playwright", "chromium-*", linux_dir, binary))
         # Windows
         for folder in ("chrome-win64", "chrome-win"):
             patterns.append(os.path.join(base, "ms-playwright", "chromium-*", folder, "chrome.exe"))
