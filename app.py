@@ -1,5 +1,7 @@
 import logging
 import os
+import subprocess
+import sys
 from datetime import datetime
 
 import pandas as pd
@@ -8,6 +10,24 @@ import streamlit as st
 from exporter import to_csv, to_excel
 from parser import parse_tenders
 import playwright_scraper
+
+# ── Auto-install Playwright Chromium on cloud (Streamlit Cloud has no binary) ──
+@st.cache_resource(show_spinner="Подготовка браузера (первый запуск ~1 мин)...")
+def _ensure_chromium():
+    if playwright_scraper._find_chromium_exe():
+        return "already_installed"
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            capture_output=True, text=True, timeout=300
+        )
+        if result.returncode == 0:
+            return "installed"
+        return f"failed: {result.stderr[-300:]}"
+    except Exception as e:
+        return f"error: {e}"
+
+_chromium_status = _ensure_chromium()
 
 # Load browserless token from Streamlit secrets if available
 try:
